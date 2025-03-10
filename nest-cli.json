@@ -1,8 +1,24 @@
 {
-  "$schema": "https://json.schemastore.org/nest-cli",
-  "collection": "@nestjs/schematics",
-  "sourceRoot": "src",
-  "compilerOptions": {
-    "deleteOutDir": true
-  }
+	"$schema": "https://json.schemastore.org/nest-cli",
+	"collection": "@nestjs/schematics",
+	"sourceRoot": "apps/mammus-api/src",
+	"compilerOptions": {
+		"deleteOutDir": true,
+		"webpack": true,
+		"tsConfigPath": "apps/mammus-api/tsconfig.app.json"
+	},
+	"monorepo": true,
+	"root": "apps/mammus-api",
+	"projects": {
+		"mammus-api": {
+			"type": "application",
+			"root": "apps/mammus-api",
+			"entryFile": "main",
+			"sourceRoot": "apps/mammus-api/src",
+			"compilerOptions": {
+				"tsConfigPath": "apps/mammus-api/tsconfig.app.json"
+			}
+		}
+	}
 }
+

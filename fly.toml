@@ -8,16 +8,37 @@ primary_region = 'gru'
 
 [build]
 
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+  
+  [[services.tcp_checks]]
+    interval = 10000
+    timeout = 2000
+
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
   processes = ['app']
 
+  [http_service.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+  
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = 10000
+    timeout = 2000
+    path = "/"
+
 [[vm]]
-  memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 512
