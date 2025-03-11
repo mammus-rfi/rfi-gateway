@@ -1,46 +1,34 @@
 # syntax = docker/dockerfile:1
 
-# Adjust NODE_VERSION as desired
-ARG NODE_VERSION=23.5.0
-FROM node:${NODE_VERSION} AS base
+# Define a versão do Node e utiliza a imagem slim
+ARG NODE_VERSION=20.18.0
+FROM node:${NODE_VERSION}-slim AS base
 
-LABEL fly_launch_runtime="NestJS"
-
-# NestJS app lives here
 WORKDIR /app
-
-# Set production environment
 ENV NODE_ENV="production"
-ARG YARN_VERSION=1.22.22
+ARG YARN_VERSION=1.22.21
 RUN npm install -g yarn@$YARN_VERSION --force
 
-
-# Throw-away build stage to reduce size of final image
+# Etapa de build
 FROM base AS build
-
-# Install packages needed to build node modules
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3 openssl
-
-# Install node modules
+# Atualiza os repositórios e instala dependências de build, incluindo o OpenSSL
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    build-essential node-gyp pkg-config python-is-python3 openssl
+# Copia os arquivos de dependências e instala os pacotes
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --production=false
-
-# Copy application code
+# Copia o restante do código e gera o Prisma Client
 COPY . .
-
-# Build application
+RUN yarn prisma generate
+# Constrói a aplicação NestJS
 RUN yarn run build
 
-
-# Final stage for app image
-FROM base
-
-RUN apt-get install --no-install-recommends -y openssl
-
-# Copy built application
+# Etapa final: imagem de produção
+FROM base AS final
+# Instala o OpenSSL na imagem final para garantir que o Prisma o detecte
+RUN apt-get update && apt-get install --no-install-recommends -y openssl
+# Copia o app construído da etapa de build
 COPY --from=build /app /app
 
-# Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
 CMD [ "yarn", "run", "start" ]
