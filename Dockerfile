@@ -36,6 +36,8 @@ RUN yarn run build
 # Final stage for app image
 FROM base
 
+RUN apt-get install --no-install-recommends -y openssl
+
 # Copy built application
 COPY --from=build /app /app
 
