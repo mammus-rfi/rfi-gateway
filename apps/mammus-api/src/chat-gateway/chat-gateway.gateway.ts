@@ -9,12 +9,14 @@ import {
 import { Logger } from '@nestjs/common';
 
 import { Server } from 'socket.io';
+import { PrismaClient } from '@prisma/client';
 
 @WebSocketGateway()
 export class ChatGateway
 	implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
 	private readonly logger: Logger = new Logger(ChatGateway.name);
+	private readonly dbClient: PrismaClient = new PrismaClient();
 
 	@WebSocketServer() io: Server;
 
@@ -34,12 +36,61 @@ export class ChatGateway
 	}
 
 	@SubscribeMessage('ping')
-	handleMessage(client: any, payload: any) {
+	handlePing(client: any, payload: any) {
 		this.logger.log(`Mensagem de client ID: ${client.id}`);
 		this.logger.debug(`Payload: ${payload}`);
 		return {
 			event: 'pong',
 			data: payload,
 		};
+	}
+
+	@SubscribeMessage('message')
+	async handleMessageCreate(client: any, payload: any) {
+		try {
+			const messageData = await this.dbClient.message.create({
+				data: payload,
+			});
+			this.logger.log('sexo 123');
+			this.io.emit('messageResponse', messageData);
+			return {
+				event: 'messageResponse',
+				data: messageData,
+			};
+		} catch (error) {
+			this.logger.error(error);
+			return {
+				event: 'messageResponse',
+				data: error,
+			};
+		}
+	}
+
+	@SubscribeMessage('enterChat')
+	async handleEnterChat(client: any, payload: any) {
+		try {
+			const chatData = await this.dbClient.chatRoom.update({
+				where: {
+					id: payload.chatRoomId,
+				},
+				data: {
+					users: {
+						connect: {
+							userId: payload.userId,
+						},
+					},
+				},
+			});
+			return {
+				event: 'enteredChatRoom',
+				data: chatData,
+			};
+		} catch (error) {
+			this.logger.error(error);
+			return {
+				event: 'enteredChatRoom',
+				data: error,
+			};
+		}
 	}
 }
