@@ -28,4 +28,4 @@ primary_region = 'gru'
 [[vm]]
   cpu_kind = 'shared'
   cpus = 2
-  memory_mb = 600
+  memory_mb = 768
