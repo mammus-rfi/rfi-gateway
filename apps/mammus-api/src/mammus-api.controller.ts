@@ -1,6 +1,7 @@
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	HttpException,
 	HttpStatus,
@@ -48,24 +49,88 @@ export class MammusApiController {
 		try {
 			const users = await this.dbClient.user.findMany();
 
-			return { users: users };
+			throw new HttpException({ users: users }, HttpStatus.OK);
 		} catch (error) {
 			this.logger.error(error);
+
 			throw new HttpException(`${error}`, HttpStatus.BAD_REQUEST);
 		}
 	}
 
-	@Put('/user/:id')
-	async updateUser(@Param('id') id: string, @Body() userData: User) {
+	@Get('/user/:id')
+	async getUserById(@Param('id') id: string) {
+		try {
+			const userData = await this.dbClient.user.findFirst({
+				where: { userId: id },
+			});
+
+			throw new HttpException({ user: userData }, HttpStatus.OK);
+		} catch (error) {
+			this.logger.error(error);
+
+			throw new HttpException(`${error}`, HttpStatus.BAD_REQUEST);
+		}
+	}
+
+	@Put('/editUser')
+	async updateUser(@Body() userData: User) {
 		try {
 			const user = await this.dbClient.user.update({
 				where: {
-					userId: id,
+					userId: userData.userId,
 				},
 				data: userData,
 			});
 
-			return { status: HttpStatus.OK, user: user };
+			throw new HttpException({ user: user }, HttpStatus.OK);
+		} catch (error) {
+			this.logger.error(error);
+
+			throw new HttpException(`${error}`, HttpStatus.BAD_REQUEST);
+		}
+	}
+
+	@Post('/createChatRoom')
+	async createChatRoom(@Body('chatName') name: string) {
+		try {
+			const chatData = await this.dbClient.chatRoom.create({
+				data: {
+					name: name,
+				},
+			});
+
+			throw new HttpException(chatData, HttpStatus.OK);
+		} catch (error) {
+			this.logger.error(error);
+
+			throw new HttpException(`${error}`, HttpStatus.BAD_REQUEST);
+		}
+	}
+
+	@Delete('/chatRoom/:id')
+	async deleteChatRoom(@Param('id') roomId: string) {
+		try {
+			await this.dbClient.chatRoom.delete({
+				where: {
+					chatRoomId: roomId,
+				},
+			});
+
+			throw new HttpException('OK', HttpStatus.OK);
+		} catch (error) {
+			this.logger.error(error);
+
+			throw new HttpException(`${error}`, HttpStatus.BAD_REQUEST);
+		}
+	}
+
+	@Post('/token')
+	async getDiscordToken(@Body() code: string) {
+		try {
+			const token = await this.mammusApiService.getToken(code);
+
+			this.logger.log(token);
+			return token;
 		} catch (error) {
 			this.logger.error(error);
 			throw new HttpException(`${error}`, HttpStatus.BAD_REQUEST);

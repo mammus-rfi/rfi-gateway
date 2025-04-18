@@ -8,8 +8,9 @@ import {
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import { MongoClient } from 'mongodb';
 
 @WebSocketGateway()
 export class ChatGateway
@@ -20,8 +21,22 @@ export class ChatGateway
 
 	@WebSocketServer() io: Server;
 
-	afterInit() {
-		this.logger.log('Iniciado');
+	async afterInit() {
+		const client = new MongoClient(process.env.DATABASE_URL);
+		await client.connect();
+
+		const db = client.db();
+
+		const collection = db.collection('Message');
+
+		const changeStream = collection.watch();
+
+		changeStream.on('change', async () => {
+			const messages = await this.dbClient.message.findMany();
+			this.io.emit('messagesUpdated', messages);
+		});
+
+		this.logger.log('WebSocket iniciado.');
 	}
 
 	handleConnection(client: any) {
@@ -36,7 +51,7 @@ export class ChatGateway
 	}
 
 	@SubscribeMessage('ping')
-	handlePing(client: any, payload: any) {
+	handlePing(client: Socket, payload: any) {
 		this.logger.log(`Mensagem de client ID: ${client.id}`);
 		this.logger.debug(`Payload: ${payload}`);
 		return {
@@ -46,32 +61,58 @@ export class ChatGateway
 	}
 
 	@SubscribeMessage('message')
-	async handleMessageCreate(client: any, payload: any) {
+	async handleMessageCreate(client: Socket, payload: any) {
 		try {
+			if (payload.chatRoomId) {
+				const messageData = await this.dbClient.message.create({
+					data: {
+						User: {
+							connect: {
+								userId: payload.userId,
+							},
+						},
+						ChatRoom: {
+							connect: {
+								chatRoomId: payload.chatRoomId,
+							},
+						},
+						data: payload.data,
+					},
+				});
+
+				this.io.to(payload.chatRoomId).emit('memberEnter', payload);
+
+				return {
+					event: 'messageResponse',
+					data: messageData,
+				};
+			}
 			const messageData = await this.dbClient.message.create({
-				data: payload,
+				data: {
+					User: {
+						connect: {
+							userId: payload.userId,
+						},
+					},
+					data: payload.data,
+				},
 			});
-			this.logger.log('sexo 123');
-			this.io.emit('messageResponse', messageData);
 			return {
 				event: 'messageResponse',
 				data: messageData,
 			};
 		} catch (error) {
-			this.logger.error(error);
-			return {
-				event: 'messageResponse',
-				data: error,
-			};
+			this.logger.error('Erro ao criar mensagem:', error);
 		}
 	}
 
 	@SubscribeMessage('enterChat')
-	async handleEnterChat(client: any, payload: any) {
+	async handleEnterChat(client: Socket, payload: any) {
 		try {
-			const chatData = await this.dbClient.chatRoom.update({
+			client.join(payload.chatRoomId);
+			await this.dbClient.chatRoom.update({
 				where: {
-					id: payload.chatRoomId,
+					chatRoomId: payload.chatRoomId,
 				},
 				data: {
 					users: {
@@ -81,9 +122,12 @@ export class ChatGateway
 					},
 				},
 			});
+			this.io
+				.to(payload.chatRoomId)
+				.emit('memberEnter', 'MEMBRO ENTROU NA SALA');
 			return {
 				event: 'enteredChatRoom',
-				data: chatData,
+				data: true,
 			};
 		} catch (error) {
 			this.logger.error(error);
