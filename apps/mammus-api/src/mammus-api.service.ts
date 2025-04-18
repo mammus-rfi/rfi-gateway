@@ -23,7 +23,7 @@ export class MammusApiService {
 				},
 			);
 
-			const { access_token } = await firstValueFrom(data);
+			const access_token = await firstValueFrom(data);
 
 			return access_token;
 		} catch (error) {
